@@ -126,13 +126,14 @@
   (make-pixel-stream-from-row 0 w h))
 
 (define (pixel-ray-dir w h pixel)
-  (let ((dir-no-norm (list
-                       (- (/ (car pixel) w) 0.5)
+  (let* ((aspect-ratio (/ w h))
+         (dir-no-norm (list
+                       (* (- (/ (car pixel) w) 0.5) aspect-ratio)
                        (- (/ (cdr pixel) h) 0.5)
                        1)))
     (vscale dir-no-norm (/ (r dir-no-norm)))))
 
-(define ((pixel->intersection w h sdf) pixel)
+(define (pixel->intersection sdf w h pixel)
   (march (pixel-ray-dir w h pixel) sdf '(0 0 0)))
 
 
@@ -147,7 +148,7 @@
     (display "255\n") 
 
     (stream-for-each (lambda (pixel)
-                  (let ((isect ((pixel->intersection w h sdf) pixel)))
+                  (let ((isect (pixel->intersection sdf w h pixel)))
                     (if (null? isect)
                       (display "0 0 0")
                       (display "0 255 0"))
@@ -164,14 +165,6 @@
 (define lens (sdf-intersection s1 s2))
 (define holy-lens (sdf-difference lens (sdf-scale sphere 0.5)))
 (define scene (sdf-translate sphere '(0 0 -3)))
-
-(define pixel-stream (make-pixel-stream 32 20))
-
-(define intersection-stream
-  (stream-map (pixel->intersection 32 20 scene)
-              pixel-stream))
-
-;(display-stream intersection-stream)
 
 (with-output-to-file "test.ppm"
                      (lambda () (renderPPM scene 640 480)))
