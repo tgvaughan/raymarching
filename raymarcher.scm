@@ -43,6 +43,17 @@
 (define (display-stream s)
   (stream-for-each (lambda (el) (display el) (newline)) s))
 
+(define (stream-enumerate-interval low high)
+  (if (< low high)
+      (cons-stream low (stream-enumerate-interval (+ low 1) high))
+      the-empty-stream))
+
+(define (stream-zip s1 s2)
+  (if (or (stream-null? s1) (stream-null? s2))
+      the-empty-stream
+      (stream-cons (cons (stream-car s1) (stream-car s2))
+                   (stream-zip (stream-cdr s1) (stream-cdr s2)))))
+
 ;; Linear algebra
 
 (define (vscale v s)
@@ -51,7 +62,7 @@
 (define (v+ . vs)
   (apply map (cons + vs)))
 
-;; CSG 
+;; CSG with signed distance functions
 
 (define (((sdf-combine proc) . sdfs) p)
   (apply proc
@@ -73,13 +84,14 @@
            (cons (car sdfs)
                  (map sdf-complement (cdr sdfs))))))
 
-;; Transformation
+;; SDF transformations
 
 (define ((sdf-translate sdf x) p)
   (sdf (v+ p x)))
 
 (define ((sdf-scale sdf f) p)
   (* (sdf (vscale p (/ f))) f))
+
 
 ;; Geometric primitives
 
@@ -109,13 +121,33 @@
         p
         (march ray-dir sdf (v+ p (vscale ray-dir dist)))))))
 
-(define (make-h-pixel-stream-from x y w)
-  (if (< x w)
-    (cons-stream (cons x y) (make-h-pixel-stream-from (+ x 1) y w))
-    the-empty-stream))
+;; Texturing
+
+(define unit+x '(+1 0 0))
+(define unit-x '(-1 0 0))
+(define unit+y '(0 +1 0))
+(define unit-y '(0 -1 0))
+(define unit+z '(0 0 +1))
+(define unit-z '(0 0 -1))
+
+(define ((sdf-normal sdf) p)
+  (let* ((eps EPSILON)
+        (eps/2 (/ EPSILON 2)))
+  (list
+   (/ (- (sdf (v+ p (vscale unit+x eps/2)))
+         (sdf (v+ p (vscale unit-x eps/2))))
+      eps)
+   (/ (- (sdf (v+ p (vscale unit+y eps/2)))
+         (sdf (v+ p (vscale unit-y eps/2))))
+      eps)
+   (/ (- (sdf (v+ p (vscale unit+z eps/2)))
+         (sdf (v+ p (vscale unit-z eps/2))))
+      eps))))
+
+;; PPM output
 
 (define (make-h-pixel-stream y w)
-  (make-h-pixel-stream-from 0 y w))
+  (stream-map (lambda (x) (cons x y)) (stream-enumerate-interval 0 w)))
 
 (define (make-pixel-stream-from-row y w h)
   (if (< y h)
@@ -124,6 +156,7 @@
 
 (define (make-pixel-stream w h)
   (make-pixel-stream-from-row 0 w h))
+
 
 (define (pixel-ray-dir w h pixel)
   (let* ((aspect-ratio (/ w h))
@@ -137,25 +170,25 @@
   (march (pixel-ray-dir w h pixel) sdf '(0 0 0)))
 
 
-;; PPM output
-
-(define (renderPPM sdf w h)
-  (let ((pixel-stream (make-pixel-stream w h)))
+(define (renderPPM sdf w h filename)
+  (call-with-output-file filename
+    (lambda (port)
+      (let ((pixel-stream (make-pixel-stream w h)))
 
     ; Header
-    (display "P3\n")
-    (display w) (display " ") (display h) (newline)
-    (display "255\n") 
+    (display "P3\n" port)
+    (display w port) (display " " port) (display h port) (newline port)
+    (display "255\n" port) 
 
     (stream-for-each (lambda (pixel)
                   (let ((isect (pixel->intersection sdf w h pixel)))
                     (if (null? isect)
-                      (display "0 0 0")
-                      (display "0 255 0"))
+                      (display "0 0 0" port)
+                      (display "0 255 0" port))
                     (if (= (- w 1) (car pixel))
-                      (newline)
-                      (display " "))))
-                pixel-stream)))
+                      (newline port)
+                      (display " " port))))
+                pixel-stream)))))
 
 
 ;;;; TEST CODE ;;;;
@@ -166,6 +199,5 @@
 (define holy-lens (sdf-difference lens (sdf-scale sphere 0.5)))
 (define scene (sdf-translate sphere '(0 0 -3)))
 
-(with-output-to-file "test.ppm"
-                     (lambda () (renderPPM scene 640 480)))
+(renderPPM scene 640 480 "test.ppm")
 (exit)
