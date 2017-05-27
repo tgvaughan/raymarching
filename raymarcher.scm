@@ -286,9 +286,14 @@
 
 ;;;; TEST CODE ;;;;
 
-(define s1 (sdf-translate sphere '(-0.5 0 0)))
-(define s2 (sdf-translate sphere '(+0.5 0 +0.5)))
-(define shell (sdf-difference s2 s1))
+(define shell (sdf-difference sphere (sdf-scale sphere 0.8)
+                              (sdf-translate (sdf-scale sphere 0.5) unit+x)
+                              (sdf-translate (sdf-scale sphere 0.5) unit-x)
+                              (sdf-translate (sdf-scale sphere 0.5) unit+y)
+                              (sdf-translate (sdf-scale sphere 0.5) unit-y)
+                              (sdf-translate (sdf-scale sphere 0.5) unit+z)
+                              (sdf-translate (sdf-scale sphere 0.5) unit-z)))
+
 (define shell-with-floor (sdf-union
                           (sdf-translate shell '(0 0 +3))
                           (sdf-translate solid-xzplane '(0 -1.0 0))))
@@ -301,7 +306,7 @@
                 (make-light '(-2 +2 0) '(0 0 255))
                 )))
 
-(define bitmap (make-bitmap scene 640 480))
+(define bitmap (make-bitmap scene 1024 768))
 (renderPPM bitmap "test.ppm")
 
 ;(exit)
