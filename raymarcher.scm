@@ -159,6 +159,23 @@
                (list 0 0 1))
          p))))
 
+(define (mod x y)
+  (- x (* (truncate (/ x y)) y)))
+
+(define ((sdf-tessellate-x sdf x1 x2) p)
+  (let ((px (vx p))
+        (py (vy p))
+        (pz (vz p))
+        (dx (- x2 x1)))
+    (let ((modpx (mod (- px x1) dx)))
+    (sdf (list
+           (+ (if (>= modpx 0)
+                modpx
+                (+ modpx dx))
+              x1)
+           py
+           pz)))))
+
 (define (sdf-normal sdf p)
   (let* ((eps EPSILON)
         (eps/2 (/ EPSILON 2)))
@@ -341,12 +358,15 @@
                 (torus 0.1)
                 (sdf-rotate-z elipsoid (/ PI 4))
                 (sdf-rotate-z elipsoid (- (/ PI 4)))))
+(define crosses (sdf-tessellate-x cross -2.0 2.0))
+
+(define crossfield (sdf-tessellate-x (sdf-rotate-y (sdf-rotate-x crosses (/ PI 2)) (/ PI 2)) -2.0 2.0))
 
 (define scene (make-scene
-               (sdf-translate cross '(0 0 5))
+               (sdf-translate (sdf-rotate-x crossfield (- (/ PI 4))) '(0 -3 10))
                (list
                 (make-light '(2 +2 0) colour-white)
                 )))
 
-(define bitmap (make-bitmap scene 640 768))
+(define bitmap (make-bitmap scene 1024 768))
 (renderPPM bitmap "test.ppm")
