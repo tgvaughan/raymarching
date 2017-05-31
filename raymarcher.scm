@@ -2,6 +2,7 @@
 
 (define EPSILON 1e-4)
 (define GLOBAL-MAXRAYLEN 1e2)
+(define PI 3.1415926535897)
 
 ;; SICP Streams
 
@@ -94,6 +95,9 @@
 (define (vnormalize v)
   (vscale v (/ (vmag v))))
 
+(define (mv* m v)
+  (map (lambda (mrow) (vdot mrow v)) m))
+
 ;; Operations on signed distance functions
 
 (define (((sdf-combine proc) . sdfs) p)
@@ -118,7 +122,36 @@
   (sdf (v- p x)))
 
 (define ((sdf-scale sdf f) p)
-  (* (sdf (vscale p (/ f))) f))
+  (if (pair? f)
+    (* (sdf (map * p (map / f))) (apply min f)) 
+    (* (sdf (vscale p (/ f))) f)))
+
+(define ((sdf-rotate-x sdf theta) p)
+  (let ((costheta (cos theta))
+        (sintheta (sin theta)))
+    (sdf (mv* (list
+               (list 1 0 0)
+               (list 0 costheta sintheta)
+               (list 0 (- sintheta) costheta))
+         p))))
+
+(define ((sdf-rotate-y sdf theta) p)
+  (let ((costheta (cos theta))
+        (sintheta (sin theta)))
+    (sdf (mv* (list
+               (list costheta 0 (- sintheta))
+               (list 0 1 0)
+               (list sintheta 0 costheta))
+         p))))
+
+(define ((sdf-rotate-z sdf theta) p)
+  (let ((costheta (cos theta))
+        (sintheta (sin theta)))
+    (sdf (mv* (list
+               (list costheta sintheta 0)
+               (list (- sintheta) costheta 0)
+               (list 0 0 1))
+         p))))
 
 (define (sdf-normal sdf p)
   (let* ((eps EPSILON)
@@ -284,29 +317,23 @@
         (apply write-byte (car bytes) opt)
         (apply write-bytes (cdr bytes) opt))))
 
+;; Colours
+
+(define colour-white '(255 255 255))
+(define colour-black '(0 0 0))
+(define colour-red '(255 0 0))
+(define colour-green '(0 255 0))
+(define colour-blue '(0 0 255))
+
 ;;;; TEST CODE ;;;;
 
-(define shell (sdf-difference sphere (sdf-scale sphere 0.8)
-                              (sdf-translate (sdf-scale sphere 0.5) unit+x)
-                              (sdf-translate (sdf-scale sphere 0.5) unit-x)
-                              (sdf-translate (sdf-scale sphere 0.5) unit+y)
-                              (sdf-translate (sdf-scale sphere 0.5) unit-y)
-                              (sdf-translate (sdf-scale sphere 0.5) unit+z)
-                              (sdf-translate (sdf-scale sphere 0.5) unit-z)))
-
-(define shell-with-floor (sdf-union
-                          (sdf-translate shell '(0 0 +3))
-                          (sdf-translate solid-xzplane '(0 -1.0 0))))
+(define elipsoid (sdf-scale sphere '(1 0.5 0.5)))
 
 (define scene (make-scene
-               shell-with-floor
+               (sdf-translate (sdf-rotate-z elipsoid (/ PI 4)) '(0 0 5))
                (list
-                (make-light '(0 +3 +3) '(0 255 0))
-                (make-light '(2 +2 0) '(255 0 0))
-                (make-light '(-2 +2 0) '(0 0 255))
+                (make-light '(2 +2 0) colour-white)
                 )))
 
-(define bitmap (make-bitmap scene 1024 768))
+(define bitmap (make-bitmap scene 640 768))
 (renderPPM bitmap "test.ppm")
-
-;(exit)
