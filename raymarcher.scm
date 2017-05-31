@@ -73,6 +73,12 @@
 (define unit-y '(0 -1 0))
 (define unit+z '(0 0 +1))
 (define unit-z '(0 0 -1))
+(define vx car)
+(define vy cadr)
+(define vz caddr)
+(define (vxy v) (list (vx v) (vy v)))
+(define (vyz v) (list (vy v) (vz v)))
+(define (vxz v) (list (vx v) (vz v)))
 
 (define (vscale v s)
   (map (lambda (vi) (* s vi)) v))
@@ -173,6 +179,9 @@
   (- (vmag p) 1.0))
 
 (define solid-xzplane cadr) ; Solid plane with normal +y
+
+(define ((torus minor-rad) p)
+  (- (vmag (list (- (vmag (vxy p)) 1.0) (vz p))) minor-rad))
 
 ;; Scene description
 
@@ -327,10 +336,14 @@
 
 ;;;; TEST CODE ;;;;
 
-(define elipsoid (sdf-scale sphere '(1 0.5 0.5)))
+(define elipsoid (sdf-scale sphere '(1 0.3 0.3)))
+(define cross (sdf-union
+                (torus 0.1)
+                (sdf-rotate-z elipsoid (/ PI 4))
+                (sdf-rotate-z elipsoid (- (/ PI 4)))))
 
 (define scene (make-scene
-               (sdf-translate (sdf-rotate-z elipsoid (/ PI 4)) '(0 0 5))
+               (sdf-translate cross '(0 0 5))
                (list
                 (make-light '(2 +2 0) colour-white)
                 )))
