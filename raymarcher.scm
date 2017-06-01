@@ -104,6 +104,30 @@
 (define (mv* m v)
   (map (lambda (mrow) (vdot mrow v)) m))
 
+(define (Rx theta)
+  (let ((costheta (cos theta))
+        (sintheta (sin theta)))
+    (list
+      (list 1 0 0)
+      (list 0 costheta (- sintheta))
+      (list 0 sintheta costheta))))
+
+(define (Ry theta)
+  (let ((costheta (cos theta))
+        (sintheta (sin theta)))
+    (list
+      (list costheta 0 sintheta)
+      (list 0 1 0)
+      (list (- sintheta) 0 costheta))))
+
+(define (Rz theta)
+  (let ((costheta (cos theta))
+        (sintheta (sin theta)))
+    (list
+      (list costheta (- sintheta) 0)
+      (list sintheta costheta 0)
+      (list 0 0 1))))
+
 ;; Operations on signed distance functions
 
 (define (((sdf-combine proc) . sdfs) p)
@@ -132,32 +156,12 @@
     (* (sdf (map * p (map / f))) (apply min f)) 
     (* (sdf (vscale p (/ f))) f)))
 
-(define ((sdf-rotate-x sdf theta) p)
-  (let ((costheta (cos theta))
-        (sintheta (sin theta)))
-    (sdf (mv* (list
-               (list 1 0 0)
-               (list 0 costheta sintheta)
-               (list 0 (- sintheta) costheta))
-         p))))
+(define (((make-sdf-rotator R) sdf theta) p)
+    (sdf (mv* (R (- theta)) p)))
 
-(define ((sdf-rotate-y sdf theta) p)
-  (let ((costheta (cos theta))
-        (sintheta (sin theta)))
-    (sdf (mv* (list
-               (list costheta 0 (- sintheta))
-               (list 0 1 0)
-               (list sintheta 0 costheta))
-         p))))
-
-(define ((sdf-rotate-z sdf theta) p)
-  (let ((costheta (cos theta))
-        (sintheta (sin theta)))
-    (sdf (mv* (list
-               (list costheta sintheta 0)
-               (list (- sintheta) costheta 0)
-               (list 0 0 1))
-         p))))
+(define sdf-rotate-x (make-sdf-rotator Rx))
+(define sdf-rotate-y (make-sdf-rotator Ry))
+(define sdf-rotate-z (make-sdf-rotator Rz))
 
 (define (mod x y)
   (- x (* (truncate (/ x y)) y)))
@@ -315,7 +319,6 @@
 (define (renderPPM b filename)
   (call-with-output-file filename
     (lambda (port)
-      ;; Header
       (display "P3\n" port)
       (display (bitmap-width b) port)
       (display " " port)
