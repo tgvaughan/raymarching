@@ -98,6 +98,9 @@
 (define (vmag p)
   (sqrt (vmag2 p)))
 
+(define (vabs v)
+  (map abs v))
+
 (define (vnormalize v)
   (vscale v (/ (vmag v))))
 
@@ -167,32 +170,29 @@
   (- x (* (truncate (/ x y)) y)))
 
 (define ((sdf-tessellate-x sdf x1 x2) p)
-  (let ((px (vx p))
-        (py (vy p))
-        (pz (vz p))
-        (dx (- x2 x1)))
-    (let ((modpx (mod (- px x1) dx)))
+  (let* ((dx (- x2 x1))
+         (modpx (mod (- (vx p) x1) dx)))
     (sdf (list
-           (+ (if (>= modpx 0)
-                modpx
-                (+ modpx dx))
-              x1)
-           py
-           pz)))))
+          (+ (if (>= modpx 0)
+                 modpx
+                 (+ modpx dx))
+             x1)
+          (vy p)
+          (vz p)))))
 
 (define (sdf-normal sdf p)
   (let* ((eps EPSILON)
-        (eps/2 (/ EPSILON 2)))
-  (list
-   (/ (- (sdf (v+ p (vscale unit+x eps/2)))
-         (sdf (v+ p (vscale unit-x eps/2))))
-      eps)
-   (/ (- (sdf (v+ p (vscale unit+y eps/2)))
-         (sdf (v+ p (vscale unit-y eps/2))))
-      eps)
-   (/ (- (sdf (v+ p (vscale unit+z eps/2)))
-         (sdf (v+ p (vscale unit-z eps/2))))
-      eps))))
+         (eps/2 (/ EPSILON 2)))
+    (list
+     (/ (- (sdf (v+ p (vscale unit+x eps/2)))
+           (sdf (v+ p (vscale unit-x eps/2))))
+        eps)
+     (/ (- (sdf (v+ p (vscale unit+y eps/2)))
+           (sdf (v+ p (vscale unit-y eps/2))))
+        eps)
+     (/ (- (sdf (v+ p (vscale unit+z eps/2)))
+           (sdf (v+ p (vscale unit-z eps/2))))
+        eps))))
 
 ;; Geometric primitives
 
@@ -203,6 +203,13 @@
 
 (define ((torus minor-rad) p)
   (- (vmag (list (- (vmag (vxy p)) 1.0) (vz p))) minor-rad))
+
+(define (cube p)
+  (let ((d (map (lambda (el) (- (abs el) 1.0)) p)))
+    (+ (min (apply max d) 0.0)
+       (vmag (map
+              (lambda (el) (max el 0.0))
+              d)))))
 
 ;; Scene description
 
@@ -215,8 +222,8 @@
 (define (scene-lights scene)
   (cdr scene))
 
-(define (make-light lightPos lightCol)
-  (cons lightPos lightCol))
+(define (make-light pos col)
+  (cons pos col))
 
 (define (light-pos light)
   (car light))
@@ -356,20 +363,16 @@
 
 ;;;; TEST CODE ;;;;
 
-(define elipsoid (sdf-scale sphere '(1 0.3 0.3)))
-(define cross (sdf-union
-                (torus 0.1)
-                (sdf-rotate-z elipsoid (/ PI 4))
-                (sdf-rotate-z elipsoid (- (/ PI 4)))))
-(define crosses (sdf-tessellate-x cross -2.0 2.0))
-
-(define crossfield (sdf-tessellate-x (sdf-rotate-y (sdf-rotate-x crosses (/ PI 2)) (/ PI 2)) -2.0 2.0))
-
 (define scene (make-scene
-               (sdf-translate (sdf-rotate-x crossfield (- (/ PI 4))) '(0 -3 10))
+               (sdf-translate
+                (sdf-union
+                 sphere
+                 (sdf-translate cube '(-2 0 0'))
+                 (sdf-translate cube '(+2 0 0')))
+                '(0 0 5))
                (list
-                (make-light '(2 +2 0) colour-white)
+                (make-light '(0 0 0) colour-white)
                 )))
 
-(define bitmap (make-bitmap scene 1024 768))
+(define bitmap (make-bitmap scene 640 480))
 (renderPPM bitmap "test.ppm")
