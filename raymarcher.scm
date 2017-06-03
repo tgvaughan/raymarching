@@ -213,14 +213,29 @@
 
 ;; Scene description
 
-(define (make-scene sdf lights)
-  (cons sdf lights))
+(define (make-scene sdf lights camera)
+  (list sdf lights camera))
 
 (define (scene-sdf scene)
   (car scene))
 
 (define (scene-lights scene)
-  (cdr scene))
+  (cadr scene))
+
+(define (scene-camera scene)
+  (caddr scene))
+
+;; Cameras
+
+(define (((make-camera location up right) w h) pixel)
+  (let* ((aspect-ratio (/ w h))
+         (dir-no-norm (list
+                       (* (- (/ (car pixel) w) 0.5) aspect-ratio)
+                       (- 0.5 (/ (cdr pixel) h))
+                       1)))
+    (vnormalize dir-no-norm)))
+
+;; Lights
 
 (define (make-light pos col)
   (cons pos col))
@@ -279,17 +294,9 @@
 (define (make-pixel-stream w h)
   (make-pixel-stream-from-row 0 w h))
 
-(define ((pixel-ray-dir w h) pixel)
-  (let* ((aspect-ratio (/ w h))
-         (dir-no-norm (list
-                       (* (- (/ (car pixel) w) 0.5) aspect-ratio)
-                       (- 0.5 (/ (cdr pixel) h))
-                       1)))
-    (vnormalize dir-no-norm)))
-
 (define (make-bitmap scene w h)
   (let* ((pixel-stream (make-pixel-stream w h))
-         (dir-stream (stream-map (pixel-ray-dir w h) pixel-stream))
+         (dir-stream (stream-map ((scene-camera scene) w h) pixel-stream))
          (intersect-finder (lambda (dir) (march dir (scene-sdf scene) '(0 0 0)
                                                 GLOBAL-MAXRAYLEN)))
          (intersect-stream (stream-map intersect-finder dir-stream))
@@ -364,15 +371,18 @@
 ;;;; TEST CODE ;;;;
 
 (define scene (make-scene
+
                (sdf-translate
                 (sdf-union
                  sphere
                  (sdf-translate cube '(-2 0 0'))
                  (sdf-translate cube '(+2 0 0')))
                 '(0 0 5))
-               (list
-                (make-light '(0 0 0) colour-white)
-                )))
+
+               (list (make-light '(0 0 0) colour-white))
+
+               (make-camera '(0 0 0) unit+y unit+x)))
+               
 
 (define bitmap (make-bitmap scene 640 480))
 (renderPPM bitmap "test.ppm")
