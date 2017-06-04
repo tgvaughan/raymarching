@@ -92,6 +92,14 @@
 (define (vdot v1 v2)
   (apply + (map * v1 v2)))
 
+(define (vcross v1 v2)
+  (let ((v1x (vx v1)) (v1y (vy v1)) (v1z (vz v1))
+        (v2x (vx v2)) (v2y (vy v2)) (v2z (vz v2)))
+  (list
+    (- (* v1y v2z) (* v1z v2y))
+    (- (* v1z v2x) (* v1x v2z))
+    (- (* v1x v2y) (* v1y v2x)))
+
 (define (vmag2 p)
   (vdot p p))
 
@@ -110,26 +118,23 @@
 (define (Rx theta)
   (let ((costheta (cos theta))
         (sintheta (sin theta)))
-    (list
-      (list 1 0 0)
-      (list 0 costheta (- sintheta))
-      (list 0 sintheta costheta))))
+    `((1 0 0)
+      (0 ,costheta ,(- sintheta))
+      (0 ,sintheta ,costheta))))
 
 (define (Ry theta)
   (let ((costheta (cos theta))
         (sintheta (sin theta)))
-    (list
-      (list costheta 0 sintheta)
-      (list 0 1 0)
-      (list (- sintheta) 0 costheta))))
+    `((,costheta 0 ,sintheta)
+      (0 1 0)
+      (,(- sintheta) 0 ,costheta))))
 
 (define (Rz theta)
   (let ((costheta (cos theta))
         (sintheta (sin theta)))
-    (list
-      (list costheta (- sintheta) 0)
-      (list sintheta costheta 0)
-      (list 0 0 1))))
+    `((,costheta ,(- sintheta) 0)
+      (,sintheta ,costheta 0)
+      (0 0 1))))
 
 ;; Operations on signed distance functions
 
@@ -375,8 +380,8 @@
                (sdf-translate
                 (sdf-union
                  sphere
-                 (sdf-translate cube '(-2 0 0'))
-                 (sdf-translate cube '(+2 0 0')))
+                 (sdf-translate cube '(-2 0 0))
+                 (sdf-translate cube '(+2 0 0)))
                 '(0 0 5))
 
                (list (make-light '(0 0 0) colour-white))
