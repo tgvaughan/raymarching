@@ -98,7 +98,7 @@
   (list
     (- (* v1y v2z) (* v1z v2y))
     (- (* v1z v2x) (* v1x v2z))
-    (- (* v1x v2y) (* v1y v2x)))
+    (- (* v1x v2y) (* v1y v2x)))))
 
 (define (vmag2 p)
   (vdot p p))
@@ -140,9 +140,7 @@
 
 (define (((sdf-combine proc) . sdfs) p)
   (apply proc
-         (map
-           (lambda (sdf) (sdf p))
-           sdfs)))
+         (map (lambda (sdf) (sdf p)) sdfs)))
 
 (define sdf-union (sdf-combine min))
 (define sdf-intersection (sdf-combine max))
@@ -215,6 +213,25 @@
        (vmag (map
               (lambda (el) (max el 0.0))
               d)))))
+
+;; Operations on textured SDFs
+
+(define ((apply-texture sdf t) p)
+  (cons t (sdf p)))
+
+(define ((make-argcomp comp) proc lst)
+  (let ((vals (map (lambda (el) (cons (proc el) el)) lst)))
+    (cdr (foldl (lambda (prev val)
+                  (if (or (null? prev) (comp (car val) (car prev)))
+                      val
+                      prev))
+                '() vals))))
+
+(define argmin (make-argcomp <))
+(define argmax (make-argcomp >))
+
+(define ((tsdf-union . tsdfs) p)
+  (argmin cdr (map (lambda (tsdf) (tsdf p)) tsdfs)))
 
 ;; Scene description
 
