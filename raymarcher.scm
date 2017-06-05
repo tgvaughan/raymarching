@@ -233,12 +233,14 @@
 (define ((tsdf-union . tsdfs) p)
   (argmin cdr (map (lambda (tsdf) (tsdf p)) tsdfs)))
 
+(define tsdf-translate sdf-translate)
+
 ;; Scene description
 
-(define (make-scene sdf lights camera)
-  (list sdf lights camera))
+(define (make-scene tsdf lights camera)
+  (list tsdf lights camera))
 
-(define (scene-sdf scene)
+(define (scene-tsdf scene)
   (car scene))
 
 (define (scene-lights scene)
@@ -270,13 +272,16 @@
 
 ;; Ray marching
 
-(define (march ray-dir sdf p maxRayLen)
+(define (march ray-dir tsdf p maxRayLen)
   (if (< maxRayLen 0)
-    '()
-    (let ((dist (sdf p)))
+    '(0 0 0)
+    (let* ((tdist (tsdf p))
+           (dist (cdr tdist)))
       (if (< dist EPSILON)
-        (v- p (vscale ray-dir EPSILON)) ;; Back off a bit
-        (march ray-dir sdf (v+ p (vscale ray-dir dist)) (- maxRayLen dist))))))
+          (let ((tfunc (car tdist))
+                (pprime (v- p (vscale ray-dir EPSILON))))
+            (tfunc tsdf pprime))
+          (march ray-dir tsdf (v+ p (vscale ray-dir dist)) (- maxRayLen dist))))))
 
 ;; Shading
 
@@ -284,24 +289,6 @@
   (map (lambda (c)
          (inexact->exact (round (min 255 (max 0 c)))))
          color))
-
-(define (shade-pixel scene intersect)
-  (if (null? intersect)
-      '(0 0 0)
-      (let* ((sdf (scene-sdf scene))
-             (N (sdf-normal sdf intersect)))
-        (color-clip
-         (apply v+ (map (lambda (light)
-                          (let* ((lightPos (light-pos light))
-                                 (lightCol (light-col light))
-                                 (lightVec (v- lightPos intersect))
-                                 (lightDist (vmag lightVec))
-                                 (lightDir (vnormalize lightVec)))
-                            (vscale lightCol
-                                    (if (null? (march lightDir sdf intersect lightDist))
-                                        (max 0 (vdot N lightDir))
-                                        0))))
-                        (scene-lights scene)))))))
 
 ;; PPM output
 
@@ -319,11 +306,9 @@
 (define (make-bitmap scene w h)
   (let* ((pixel-stream (make-pixel-stream w h))
          (dir-stream (stream-map ((scene-camera scene) w h) pixel-stream))
-         (intersect-finder (lambda (dir) (march dir (scene-sdf scene) '(0 0 0)
+         (ray-colorer (lambda (dir) (march dir (scene-tsdf scene) '(0 0 0)
                                                 GLOBAL-MAXRAYLEN)))
-         (intersect-stream (stream-map intersect-finder dir-stream))
-         (pixel-shader (lambda (intersect) (shade-pixel scene intersect)))
-         (pixel-color-stream (stream-map pixel-shader intersect-stream)))
+         (pixel-color-stream (stream-map ray-colorer dir-stream)))
     (list w h (stream-zip pixel-stream pixel-color-stream))))
 
 (define (bitmap-width bitmap)
@@ -394,11 +379,11 @@
 
 (define scene (make-scene
 
-               (sdf-translate
-                (sdf-union
-                 sphere
-                 (sdf-translate cube '(-2 0 0))
-                 (sdf-translate cube '(+2 0 0)))
+               (tsdf-translate
+                (tsdf-union
+                 (apply-texture sphere (lambda (p tsdf) colour-red))
+                 (apply-texture (sdf-translate cube '(-2 0 0)) (lambda (p tsdf) colour-green))
+                 (apply-texture (sdf-translate cube '(+2 0 0)) (lambda (p tsdf) colour-blue)))
                 '(0 0 5))
 
                (list (make-light '(0 0 0) colour-white))
